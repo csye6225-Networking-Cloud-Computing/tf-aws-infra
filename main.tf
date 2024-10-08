@@ -1,6 +1,6 @@
 # Provider Configuration
 provider "aws" {
-  profile = var.env  # Use variable to switch between dev/demo environments
+  profile = var.env # Use variable to switch between dev/demo environments
   region  = var.region
 }
 
@@ -27,10 +27,10 @@ resource "aws_internet_gateway" "main" {
 
 # Public Subnets Loop
 resource "aws_subnet" "public_subnets" {
-  count             = length(var.public_subnets)
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.public_subnets[count.index]
-  availability_zone = element(var.azs, count.index)
+  count                   = length(var.public_subnets)
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnets[count.index]
+  availability_zone       = element(var.azs, count.index)
   map_public_ip_on_launch = true
 
   tags = {
@@ -66,8 +66,8 @@ resource "aws_route_table" "public" {
 
 # Public Route Table Associations for Public Subnets Loop
 resource "aws_route_table_association" "public_association" {
-  count         = length(aws_subnet.public_subnets)
-  subnet_id     = aws_subnet.public_subnets[count.index].id
+  count          = length(aws_subnet.public_subnets)
+  subnet_id      = aws_subnet.public_subnets[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
