@@ -1,40 +1,32 @@
-name: PR Check
+name: Terraform CI
 
 on:
   pull_request:
-    branches:
-      - main  
+    branches: [ main ]
+
 jobs:
   terraform:
-    name: Terraform
+    name: Terraform CI
     runs-on: ubuntu-latest
-
-    env:
-      TF_VERSION: '1.9.7'  
-      TF_WORKING_DIR: '.'  
-
+    
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v3
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-      with:
-        terraform_version: ${{ env.TF_VERSION }}
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Terraform Format
+      id: fmt
+      run: terraform fmt -check -recursive
+      continue-on-error: true
 
     - name: Terraform Init
       run: terraform init
-      working-directory: ${{ env.TF_WORKING_DIR }}
-
-    - name: Terraform Format
-      run: terraform fmt -check
-      working-directory: ${{ env.TF_WORKING_DIR }}
 
     - name: Terraform Validate
       run: terraform validate
-      working-directory: ${{ env.TF_WORKING_DIR }}
 
-    - name: Terraform Plan
-      run: terraform plan
-      working-directory: ${{ env.TF_WORKING_DIR }}
-      continue-on-error: true
+    - name: Check Terraform formatting
+      if: steps.fmt.outcome == 'failure'
+      run: exit 1
