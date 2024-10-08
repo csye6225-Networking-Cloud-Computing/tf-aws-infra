@@ -9,11 +9,24 @@ jobs:
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
-      - name: Terraform fmt check
-        run: terraform fmt -check
-      - name: Terraform validate
+      # Step 1: Checkout the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Terraform
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.7
+
+      # Step 3: Initialize Terraform (terraform init)
+      - name: Terraform init
+        run: terraform init
+
+      # Step 4: Run terraform fmt to ensure proper formatting
+      - name: Terraform FMT
+        run: terraform fmt -check -recursive
+
+      # Step 5: Run terraform validate to validate the configuration files
+      - name: Terraform Validate
         run: terraform validate
