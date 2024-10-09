@@ -97,7 +97,5 @@ Make sure your changes pass all checks before merging.
 - `outputs.tf`: Specifies the output values.
 - `terraform.tfvars`: Contains values for the input variables.
 
-## Contributing
 
-Please open a pull request for any changes or enhancements to the infrastructure configuration. Ensure all Terraform formatting and validation checks pass in the CI pipeline before submitting.
 
