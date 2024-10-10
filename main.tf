@@ -1,6 +1,5 @@
 # Provider Configuration
 provider "aws" {
-  
   profile = var.env # Use variable to switch between dev/demo environments
   region  = var.region
 }
