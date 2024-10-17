@@ -39,7 +39,7 @@ variable "region" {
 # Application Environment (dev, demo, prod)
 variable "env" {
   description = "Application environment"
-  default     = "dev"
+  default     = "github-user"
 }
 
 # Allowed SSH CIDR Blocks
