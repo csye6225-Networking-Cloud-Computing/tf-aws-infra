@@ -39,7 +39,7 @@ variable "region" {
 # Application Environment (dev, demo, prod)
 variable "env" {
   description = "Application environment"
-  default     = "demo"
+  default     = "dev"
 }
 
 # Allowed SSH CIDR Blocks

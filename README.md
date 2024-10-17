@@ -97,5 +97,7 @@ Make sure your changes pass all checks before merging.
 - `outputs.tf`: Specifies the output values.
 - `terraform.tfvars`: Contains values for the input variables.
 
+readme updated
+
 
 
