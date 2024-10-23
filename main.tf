@@ -1,6 +1,6 @@
 # Provider Configuration
 provider "aws" {
-  profile = var.aws_profile # Use variable to switch between dev/demo environments
+  profile = var.aws_profile
   region  = var.region
 }
 
@@ -94,35 +94,35 @@ resource "aws_security_group" "web_app_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidrs # SSH access from specific IPs or ranges
+    cidr_blocks = var.allowed_ssh_cidrs
   }
 
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # HTTP access
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # HTTPS access
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = var.app_port
     to_port     = var.app_port
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Application port access
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"] # Allow all outbound traffic
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
@@ -138,7 +138,7 @@ resource "aws_security_group" "rds_sg" {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.web_app_sg.id] # Allow traffic from the web app security group
+    security_groups = [aws_security_group.web_app_sg.id]
   }
 
   egress {
@@ -156,7 +156,7 @@ resource "aws_security_group" "rds_sg" {
 # RDS Parameter Group for MySQL
 resource "aws_db_parameter_group" "my_db_parameter_group" {
   name        = "${var.env}-rds-parameter-group"
-  family      = "mysql8.0" # Adjust the family based on the version of MySQL you are using
+  family      = "mysql8.0"
   description = "Custom parameter group for MySQL RDS instance"
 
   parameter {
@@ -182,17 +182,17 @@ resource "aws_db_subnet_group" "rds_subnet_group" {
 
 # RDS Instance
 resource "aws_db_instance" "rds_instance" {
-  allocated_storage    = 20
-  engine               = "mysql"
-  instance_class       = "db.t3.micro"
-  db_name              = var.db_name # Use the variable for DB name
-  username             = var.db_username # Use the variable for DB username
-  password             = var.db_password # Use the variable for DB password
-  parameter_group_name = aws_db_parameter_group.my_db_parameter_group.name # Use the custom parameter group
-  skip_final_snapshot  = true
-  publicly_accessible  = false
+  allocated_storage      = 20
+  engine                 = "mysql"
+  instance_class         = "db.t3.micro"
+  db_name                = var.db_name
+  username               = var.db_username
+  password               = var.db_password
+  parameter_group_name   = aws_db_parameter_group.my_db_parameter_group.name
+  skip_final_snapshot    = true
+  publicly_accessible    = false
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
-  db_subnet_group_name = aws_db_subnet_group.rds_subnet_group.name
+  db_subnet_group_name   = aws_db_subnet_group.rds_subnet_group.name
 
   tags = {
     Name = "${var.env}-rds-instance"
@@ -205,14 +205,13 @@ resource "aws_instance" "web_app_instance" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_subnets[0].id
   vpc_security_group_ids = [aws_security_group.web_app_sg.id]
-  key_name               = var.key_pair # Key pair for SSH access
+  key_name               = var.key_pair
 
   root_block_device {
     volume_size = var.root_volume_size
     volume_type = var.volume_type
   }
 
-  # Pass RDS details through user data
   user_data = <<-EOF
               #!/bin/bash
               echo "DB_HOST=${aws_db_instance.rds_instance.address}" >> /etc/environment
