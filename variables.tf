@@ -39,20 +39,20 @@ variable "region" {
 # Application Environment (dev, demo, prod)
 variable "env" {
   description = "Application environment"
-  default     = "github-user"
+  default     = "demo"
 }
 
 # Allowed SSH CIDR Blocks
 variable "allowed_ssh_cidrs" {
   description = "Allowed CIDR blocks for SSH access"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # Use your IP for better security
+  default     = ["0.0.0.0/0"] # Use your actual IP for better security
 }
 
 # Custom AMI
 variable "custom_ami" {
   description = "AMI ID of the custom image created by Packer"
-  default     = "ami-0841f594ce08159e5" # Replace with your custom AMI ID
+  default     = "ami-08f1ff826dff443f8" # Replace with your custom AMI ID
 }
 
 # EC2 Instance Type
@@ -82,4 +82,18 @@ variable "app_port" {
 variable "key_pair" {
   description = "Key pair name for SSH access"
   default     = "my-aws-key" # Replace with your actual key pair
+}
+
+# Database Configuration Variables
+variable "db_name" {
+  description = "The name of the RDS database"
+}
+
+variable "db_username" {
+  description = "The username for the RDS database"
+}
+
+variable "db_password" {
+  description = "The password for the RDS database"
+  sensitive   = true
 }
