@@ -223,7 +223,7 @@ resource "random_id" "bucket_name" {
 resource "aws_s3_bucket" "private_webapp_bucket" {
   bucket = "s3-${var.env}-${random_id.bucket_name.hex}"
 
-  force_destroy = true  # Allow deletion of non-empty bucket
+  force_destroy = true # Allow deletion of non-empty bucket
 
   tags = {
     Name        = "${var.env}-private-webapp-bucket"
@@ -236,7 +236,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "s3_lifecycle_config" {
   bucket = aws_s3_bucket.private_webapp_bucket.bucket
 
   rule {
-    id     = "lifecycle"
+    id = "lifecycle"
     filter {}
 
     transition {
@@ -292,16 +292,16 @@ resource "aws_iam_policy" "s3_cloudwatch_statsd_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect   = "Allow",
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+        Effect = "Allow",
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
         Resource = [
           "arn:aws:s3:::${aws_s3_bucket.private_webapp_bucket.bucket}/*",
           "arn:aws:s3:::${aws_s3_bucket.private_webapp_bucket.bucket}"
         ]
       },
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "cloudwatch:PutMetricData",
           "cloudwatch:GetMetricStatistics",
           "cloudwatch:ListMetrics",
@@ -310,8 +310,8 @@ resource "aws_iam_policy" "s3_cloudwatch_statsd_policy" {
         Resource = "*"
       },
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
@@ -362,8 +362,8 @@ resource "aws_instance" "web_app_instance" {
 
   # Enable IMDSv2 requirement
   metadata_options {
-    http_tokens = "required"  # Enforces IMDSv2
-    http_endpoint = "enabled" # Ensures the metadata endpoint is enabled
+    http_tokens   = "required" # Enforces IMDSv2
+    http_endpoint = "enabled"  # Ensures the metadata endpoint is enabled
   }
 
   user_data = <<-EOF
