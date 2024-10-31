@@ -46,7 +46,7 @@ variable "env" {
 variable "allowed_ssh_cidrs" {
   description = "Allowed CIDR blocks for SSH access"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # Use your actual IP for better security
+  default     = ["0.0.0.0/0"] # Replace with your actual IP for better security
 }
 
 # Custom AMI
@@ -97,3 +97,30 @@ variable "db_password" {
   description = "The password for the RDS database"
   sensitive   = true
 }
+
+variable "db_port" {
+  description = "Database port number"
+  type        = number
+  default     = 3306
+}
+
+# Domain Name
+variable "domain_name" {
+  description = "The root domain name for Route 53"
+}
+
+# Record Type for Route 53
+variable "record_type" {
+  description = "DNS record type for Route 53 (e.g., A, CNAME)"
+  default     = "A"
+}
+
+# TTL for Route 53 record
+variable "ttl" {
+  description = "Time to Live (TTL) for the Route 53 record"
+  type        = number
+  default     = 300
+}
+
+# Remove the unused 'zone_id' variable
+# (This variable is not needed because we're fetching it dynamically in the code)
