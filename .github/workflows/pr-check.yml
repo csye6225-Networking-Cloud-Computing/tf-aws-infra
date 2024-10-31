@@ -29,6 +29,4 @@ jobs:
 
     - name: Check Terraform formatting
       if: steps.fmt.outcome == 'failure'
-      run: |
-        echo "Terraform formatting check failed"
-        exit 1
+      run: exit 1
