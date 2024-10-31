@@ -1,3 +1,17 @@
+# Terraform Configuration
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0" # Update this to the latest version you are using
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+  }
+}
+
 # Provider Configuration
 provider "aws" {
   profile = var.aws_profile
@@ -184,6 +198,7 @@ resource "aws_db_subnet_group" "rds_subnet_group" {
 resource "aws_db_instance" "rds_instance" {
   allocated_storage      = 20
   engine                 = "mysql"
+  engine_version         = "8.0"
   instance_class         = "db.t3.micro"
   db_name                = var.db_name
   username               = var.db_username
@@ -199,17 +214,156 @@ resource "aws_db_instance" "rds_instance" {
   }
 }
 
-# EC2 Instance using Custom AMI (Remote MySQL on RDS)
+# Random ID for Bucket Name
+resource "random_id" "bucket_name" {
+  byte_length = 7
+}
+
+# S3 Bucket Configuration
+resource "aws_s3_bucket" "private_webapp_bucket" {
+  bucket = "s3-${var.env}-${random_id.bucket_name.hex}"
+
+  force_destroy = true # Allow deletion of non-empty bucket
+
+  tags = {
+    Name        = "${var.env}-private-webapp-bucket"
+    Environment = "${var.env} - S3 Bucket"
+  }
+}
+
+# S3 Bucket Lifecycle Configuration (Transition to STANDARD_IA after 30 days)
+resource "aws_s3_bucket_lifecycle_configuration" "s3_lifecycle_config" {
+  bucket = aws_s3_bucket.private_webapp_bucket.bucket
+
+  rule {
+    id = "lifecycle"
+    filter {}
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+    status = "Enabled"
+  }
+}
+
+# Enable Default Encryption on S3 Bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "s3_key_encryption" {
+  bucket = aws_s3_bucket.private_webapp_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# Restrict Public Access to S3 Bucket
+resource "aws_s3_bucket_public_access_block" "s3_bucket_public_access_block" {
+  bucket = aws_s3_bucket.private_webapp_bucket.bucket
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# IAM Role for EC2 to Access S3 and CloudWatch
+resource "aws_iam_role" "s3_access_role_to_ec2" {
+  name = "${var.env}-S3BucketAccessRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect    = "Allow",
+      Sid       = "RoleForEC2",
+      Principal = { Service = "ec2.amazonaws.com" },
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+# IAM Policy for S3, CloudWatch, and CloudWatch Logs for StatsD
+resource "aws_iam_policy" "s3_cloudwatch_statsd_policy" {
+  name        = "${var.env}-S3CloudWatchStatsDPolicy"
+  description = "Policy for EC2 to interact with S3, CloudWatch, and CloudWatch Logs for StatsD metrics and logging"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+        Resource = [
+          "arn:aws:s3:::${aws_s3_bucket.private_webapp_bucket.bucket}/*",
+          "arn:aws:s3:::${aws_s3_bucket.private_webapp_bucket.bucket}"
+        ]
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "cloudwatch:DescribeAlarms"
+        ],
+        Resource = "*"
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# CloudWatch Agent Policy Data Source
+data "aws_iam_policy" "cloudwatch_policy" {
+  arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# Attach Policies to EC2 Role
+resource "aws_iam_policy_attachment" "attach_s3_cloudwatch_statsd_policy" {
+  name       = "${var.env}-attach-s3-cloudwatch-statsd-policy"
+  roles      = [aws_iam_role.s3_access_role_to_ec2.name]
+  policy_arn = aws_iam_policy.s3_cloudwatch_statsd_policy.arn
+}
+
+resource "aws_iam_policy_attachment" "policy_role_attach_cloudwatch" {
+  name       = "${var.env}-policy_role_attach_cloudwatch"
+  roles      = [aws_iam_role.s3_access_role_to_ec2.name]
+  policy_arn = data.aws_iam_policy.cloudwatch_policy.arn
+}
+
+# Instance Profile for EC2 Role
+resource "aws_iam_instance_profile" "ec2_role_profile" {
+  name = "${var.env}-ec2-role-profile"
+  role = aws_iam_role.s3_access_role_to_ec2.name
+}
+
+# EC2 Instance Configuration
 resource "aws_instance" "web_app_instance" {
   ami                    = var.custom_ami
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_subnets[0].id
   vpc_security_group_ids = [aws_security_group.web_app_sg.id]
   key_name               = var.key_pair
+  iam_instance_profile   = aws_iam_instance_profile.ec2_role_profile.name
 
   root_block_device {
     volume_size = var.root_volume_size
     volume_type = var.volume_type
+  }
+
+  # Enable IMDSv2 requirement
+  metadata_options {
+    http_tokens   = "required" # Enforces IMDSv2
+    http_endpoint = "enabled"  # Ensures the metadata endpoint is enabled
   }
 
   user_data = <<-EOF
@@ -218,9 +372,15 @@ resource "aws_instance" "web_app_instance" {
               echo "DB_USER=${var.db_username}" >> /etc/environment
               echo "DB_PASSWORD=${var.db_password}" >> /etc/environment
               echo "DB_NAME=${var.db_name}" >> /etc/environment
-
+              echo "S3_BUCKET_NAME=${aws_s3_bucket.private_webapp_bucket.bucket}" >> /etc/environment
+              echo "AWS_REGION=${var.region}" >> /etc/environment
+              
               # Source the environment variables
               source /etc/environment
+
+              # Restart CloudWatch agent and StatsD to ensure they're running
+              sudo systemctl restart amazon-cloudwatch-agent.service
+              sudo systemctl restart statsd.service  # Restart StatsD using systemd
 
               # Restart the application service to apply new environment variables
               sudo systemctl restart my-app.service
@@ -229,4 +389,20 @@ resource "aws_instance" "web_app_instance" {
   tags = {
     Name = "${var.env}-web-app-instance"
   }
+}
+
+
+# Route 53 Zone Data Source
+data "aws_route53_zone" "selected_zone" {
+  name         = var.domain_name
+  private_zone = false
+}
+
+# Route 53 A Record Mapping to EC2 Instance
+resource "aws_route53_record" "server_mapping_record" {
+  zone_id = data.aws_route53_zone.selected_zone.zone_id
+  name    = var.domain_name
+  type    = var.record_type
+  ttl     = var.ttl
+  records = [aws_instance.web_app_instance.public_ip]
 }
