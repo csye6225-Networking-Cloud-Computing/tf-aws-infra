@@ -43,7 +43,7 @@ resource "aws_subnet" "public_subnets" {
   count                   = length(var.public_subnets)
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnets[count.index]
-  availability_zone       = element(var.azs, count.index)
+  availability_zone       = var.azs[count.index]
   map_public_ip_on_launch = true
 
   tags = {
@@ -56,7 +56,7 @@ resource "aws_subnet" "private_subnets" {
   count             = length(var.private_subnets)
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_subnets[count.index]
-  availability_zone = element(var.azs, count.index)
+  availability_zone = var.azs[count.index]
 
   tags = {
     Name = "${var.env}-private-subnet-${count.index + 1}"
@@ -112,10 +112,10 @@ resource "aws_security_group" "web_app_sg" {
   }
 
   ingress {
-    from_port                = var.app_port
-    to_port                  = var.app_port
-    protocol                 = "tcp"
-    security_groups          = [aws_security_group.lb_sg.id]
+    from_port       = var.app_port
+    to_port         = var.app_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lb_sg.id]
   }
 
   egress {
@@ -187,11 +187,11 @@ resource "aws_iam_role" "s3_access_role_to_ec2" {
   name = "${var.env}-S3BucketAccessRole"
 
   assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect    = "Allow",
-      Principal = { Service = "ec2.amazonaws.com" },
-      Action    = "sts:AssumeRole"
+    Version : "2012-10-17",
+    Statement : [{
+      Effect    : "Allow",
+      Principal : { Service : "ec2.amazonaws.com" },
+      Action    : "sts:AssumeRole"
     }]
   })
 }
@@ -206,35 +206,36 @@ resource "aws_iam_instance_profile" "ec2_role_profile" {
 resource "aws_iam_policy" "s3_cloudwatch_statsd_policy" {
   name        = "${var.env}-S3CloudWatchStatsDPolicy"
   description = "Policy for EC2 to interact with S3, CloudWatch, and CloudWatch Logs for StatsD metrics and logging"
+
   policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
+    Version : "2012-10-17",
+    Statement : [
       {
-        Effect = "Allow",
-        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
-        Resource = [
+        Effect : "Allow",
+        Action : ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+        Resource : [
           "arn:aws:s3:::${aws_s3_bucket.private_webapp_bucket.bucket}/*",
           "arn:aws:s3:::${aws_s3_bucket.private_webapp_bucket.bucket}"
         ]
       },
       {
-        Effect = "Allow",
-        Action = [
+        Effect : "Allow",
+        Action : [
           "cloudwatch:PutMetricData",
           "cloudwatch:GetMetricStatistics",
           "cloudwatch:ListMetrics",
           "cloudwatch:DescribeAlarms"
         ],
-        Resource = "*"
+        Resource : "*"
       },
       {
-        Effect = "Allow",
-        Action = [
+        Effect : "Allow",
+        Action : [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ],
-        Resource = "*"
+        Resource : "*"
       }
     ]
   })
@@ -266,7 +267,7 @@ resource "random_id" "bucket_name" {
 
 # S3 Bucket Configuration
 resource "aws_s3_bucket" "private_webapp_bucket" {
-  bucket = "s3-${var.env}-${random_id.bucket_name.hex}"
+  bucket        = "s3-${var.env}-${random_id.bucket_name.hex}"
   force_destroy = true
 
   tags = {
@@ -370,56 +371,58 @@ resource "aws_launch_template" "app_launch_template" {
   }
 
   user_data = base64encode(<<-EOF
-              #!/bin/bash
-              echo "DB_HOST=${aws_db_instance.rds_instance.address}" >> /etc/environment
-              echo "DB_USER=${var.db_username}" >> /etc/environment
-              echo "DB_PASSWORD=${var.db_password}" >> /etc/environment
-              echo "DB_NAME=${var.db_name}" >> /etc/environment
-              echo "S3_BUCKET_NAME=${aws_s3_bucket.private_webapp_bucket.bucket}" >> /etc/environment
-              echo "AWS_REGION=${var.region}" >> /etc/environment
-              
-              source /etc/environment
-              sudo systemctl restart amazon-cloudwatch-agent.service
-              sudo systemctl restart statsd.service  # Restart StatsD using systemd
-              sudo systemctl restart my-app.service
-              EOF
+    #!/bin/bash
+    echo "DB_HOST=${aws_db_instance.rds_instance.address}" >> /etc/environment
+    echo "DB_USER=${var.db_username}" >> /etc/environment
+    echo "DB_PASSWORD=${var.db_password}" >> /etc/environment
+    echo "DB_NAME=${var.db_name}" >> /etc/environment
+    echo "S3_BUCKET_NAME=${aws_s3_bucket.private_webapp_bucket.bucket}" >> /etc/environment
+    echo "AWS_REGION=${var.region}" >> /etc/environment
+
+    source /etc/environment
+    sudo systemctl restart amazon-cloudwatch-agent.service
+    sudo systemctl restart statsd.service  # Restart StatsD using systemd
+    sudo systemctl restart my-app.service
+    EOF
   )
 }
 
 # Auto Scaling Group
 resource "aws_autoscaling_group" "app_asg" {
-  desired_capacity = var.desired_capacity
-  max_size = var.max_size
-  min_size = var.min_size
-  vpc_zone_identifier = aws_subnet.public_subnets[*].id
-  target_group_arns = [aws_lb_target_group.app_tg.arn]
+  desired_capacity     = var.desired_capacity
+  max_size             = var.max_size
+  min_size             = var.min_size
+  vpc_zone_identifier  = aws_subnet.public_subnets[*].id
+  target_group_arns    = [aws_lb_target_group.app_tg.arn]
+  health_check_type    = "ELB"
+  health_check_grace_period = 300
+
   launch_template {
-    id = aws_launch_template.app_launch_template.id
+    id      = aws_launch_template.app_launch_template.id
     version = "$Latest"
   }
-  health_check_type = "ELB"
-  health_check_grace_period = 300
+
   tag {
-    key = "Name"
-    value = "${var.env}-web-app-instance"
+    key                 = "Name"
+    value               = "${var.env}-web-app-instance"
     propagate_at_launch = true
   }
 }
 
 # Scaling Policies
 resource "aws_autoscaling_policy" "scale_up" {
-  name = "scale-up-policy"
-  scaling_adjustment = 1
-  adjustment_type = "ChangeInCapacity"
-  cooldown = 60
+  name                   = "scale-up-policy"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
   autoscaling_group_name = aws_autoscaling_group.app_asg.name
 }
 
 resource "aws_autoscaling_policy" "scale_down" {
-  name = "scale-down-policy"
-  scaling_adjustment = -1
-  adjustment_type = "ChangeInCapacity"
-  cooldown = 60
+  name                   = "scale-down-policy"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
   autoscaling_group_name = aws_autoscaling_group.app_asg.name
 }
 
@@ -427,14 +430,15 @@ resource "aws_autoscaling_policy" "scale_down" {
 resource "aws_cloudwatch_metric_alarm" "high_cpu_alarm" {
   alarm_name          = "${var.env}-high-cpu-alarm"
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = "2"
+  evaluation_periods  = 2
   metric_name         = "CPUUtilization"
   namespace           = "AWS/EC2"
-  period              = "60"
+  period              = 60
   statistic           = "Average"
-  threshold           = "12"
-  alarm_description   = "This metric monitors ec2 cpu utilization"
+  threshold           = 12
+  alarm_description   = "This metric monitors EC2 CPU utilization"
   alarm_actions       = [aws_autoscaling_policy.scale_up.arn]
+
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.app_asg.name
   }
@@ -443,14 +447,15 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu_alarm" {
 resource "aws_cloudwatch_metric_alarm" "low_cpu_alarm" {
   alarm_name          = "${var.env}-low-cpu-alarm"
   comparison_operator = "LessThanOrEqualToThreshold"
-  evaluation_periods  = "2"
+  evaluation_periods  = 2
   metric_name         = "CPUUtilization"
   namespace           = "AWS/EC2"
-  period              = "60"
+  period              = 60
   statistic           = "Average"
-  threshold           = "8"
-  alarm_description   = "This metric monitors ec2 cpu utilization"
+  threshold           = 8
+  alarm_description   = "This metric monitors EC2 CPU utilization"
   alarm_actions       = [aws_autoscaling_policy.scale_down.arn]
+
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.app_asg.name
   }
@@ -458,17 +463,18 @@ resource "aws_cloudwatch_metric_alarm" "low_cpu_alarm" {
 
 # Route 53 Record
 data "aws_route53_zone" "selected_zone" {
-  name = var.domain_name
+  name         = var.domain_name
   private_zone = false
 }
 
 resource "aws_route53_record" "app_record" {
   zone_id = data.aws_route53_zone.selected_zone.zone_id
-  name = var.domain_name
-  type = "A"
+  name    = var.domain_name
+  type    = "A"
+
   alias {
-    name = aws_lb.app_lb.dns_name
-    zone_id = aws_lb.app_lb.zone_id
+    name                   = aws_lb.app_lb.dns_name
+    zone_id                = aws_lb.app_lb.zone_id
     evaluate_target_health = true
   }
 }
