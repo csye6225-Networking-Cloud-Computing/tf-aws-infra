@@ -191,9 +191,9 @@ resource "aws_iam_role" "s3_access_role_to_ec2" {
   assume_role_policy = jsonencode({
     Version : "2012-10-17",
     Statement : [{
-      Effect    : "Allow",
+      Effect : "Allow",
       Principal : { Service : "ec2.amazonaws.com" },
-      Action    : "sts:AssumeRole"
+      Action : "sts:AssumeRole"
     }]
   })
 }
@@ -392,13 +392,13 @@ resource "aws_launch_template" "app_launch_template" {
 
 # Auto Scaling Group
 resource "aws_autoscaling_group" "app_asg" {
-  name                 = "${var.env}-app-asg"
-  desired_capacity     = var.desired_capacity
-  max_size             = var.max_size
-  min_size             = var.min_size
-  vpc_zone_identifier  = aws_subnet.public_subnets[*].id
-  target_group_arns    = [aws_lb_target_group.app_tg.arn]
-  health_check_type    = "ELB"
+  name                      = "${var.env}-app-asg"
+  desired_capacity          = var.desired_capacity
+  max_size                  = var.max_size
+  min_size                  = var.min_size
+  vpc_zone_identifier       = aws_subnet.public_subnets[*].id
+  target_group_arns         = [aws_lb_target_group.app_tg.arn]
+  health_check_type         = "ELB"
   health_check_grace_period = 300
 
   launch_template {

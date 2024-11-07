@@ -121,7 +121,7 @@ variable "ttl" {
   type        = number
   default     = 300
 }
- # Auto-scaling configuration
+# Auto-scaling configuration
 variable "desired_capacity" {
   default     = 3
   description = "Desired number of instances in the auto-scaling group"
