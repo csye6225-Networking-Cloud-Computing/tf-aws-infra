@@ -102,6 +102,7 @@ resource "aws_route_table_association" "private_association" {
 
 # Security Group for Web Application
 resource "aws_security_group" "web_app_sg" {
+  name   = "${var.env}-web-app-sg"
   vpc_id = aws_vpc.main.id
 
   ingress {
@@ -132,6 +133,7 @@ resource "aws_security_group" "web_app_sg" {
 
 # Security Group for RDS
 resource "aws_security_group" "rds_sg" {
+  name   = "${var.env}-rds-sg"
   vpc_id = aws_vpc.main.id
 
   ingress {
@@ -278,6 +280,7 @@ resource "aws_s3_bucket" "private_webapp_bucket" {
 
 # Security Group for ALB
 resource "aws_security_group" "lb_sg" {
+  name   = "${var.env}-lb-sg"
   vpc_id = aws_vpc.main.id
 
   ingress {
@@ -389,6 +392,7 @@ resource "aws_launch_template" "app_launch_template" {
 
 # Auto Scaling Group
 resource "aws_autoscaling_group" "app_asg" {
+  name                 = "${var.env}-app-asg"
   desired_capacity     = var.desired_capacity
   max_size             = var.max_size
   min_size             = var.min_size
