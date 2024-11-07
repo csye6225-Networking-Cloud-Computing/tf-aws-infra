@@ -121,6 +121,19 @@ variable "ttl" {
   type        = number
   default     = 300
 }
+ # Auto-scaling configuration
+variable "desired_capacity" {
+  default     = 3
+  description = "Desired number of instances in the auto-scaling group"
+}
 
-# Remove the unused 'zone_id' variable
-# (This variable is not needed because we're fetching it dynamically in the code)
+variable "max_size" {
+  default     = 5
+  description = "Maximum number of instances in the auto-scaling group"
+}
+
+variable "min_size" {
+  default     = 3
+  description = "Minimum number of instances in the auto-scaling group"
+}
+
