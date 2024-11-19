@@ -367,7 +367,7 @@ resource "aws_s3_object" "lambda_code" {
   bucket = aws_s3_bucket.lambda_code_bucket.id
   key    = local.lambda_s3_key
   source = "C:/Users/aayus/OneDrive/Desktop/serverless/emailVerification.zip"
-  etag   = filemd5("C:/Users/aayus/OneDrive/Desktop/serverless/emailVerification.zip")
+  #etag   = filemd5("C:/Users/aayus/OneDrive/Desktop/serverless/emailVerification.zip")
 }
 
 # Security Group for ALB
