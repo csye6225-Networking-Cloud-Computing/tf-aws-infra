@@ -18,6 +18,9 @@ provider "aws" {
   region  = var.region
 }
 
+# Data Source to Retrieve AWS Account ID
+data "aws_caller_identity" "current" {}
+
 # VPC
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
@@ -51,7 +54,7 @@ resource "aws_subnet" "public_subnets" {
   }
 }
 
-# Private Subnets (For RDS)
+# Private Subnets (For RDS and Lambda)
 resource "aws_subnet" "private_subnets" {
   count             = length(var.private_subnets)
   vpc_id            = aws_vpc.main.id
@@ -100,6 +103,34 @@ resource "aws_route_table_association" "private_association" {
   route_table_id = aws_route_table.private.id
 }
 
+# NAT Gateway Elastic IP
+resource "aws_eip" "nat_eip" {
+  vpc = true
+
+  tags = {
+    Name = "${var.env}-nat-eip"
+  }
+}
+
+# NAT Gateway
+resource "aws_nat_gateway" "nat_gw" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.public_subnets[0].id
+
+  tags = {
+    Name = "${var.env}-nat-gateway"
+  }
+}
+
+# Update Private Route Table to Include NAT Gateway
+resource "aws_route" "private_nat_route" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat_gw.id
+
+  depends_on = [aws_nat_gateway.nat_gw]
+}
+
 # Security Group for Web Application
 resource "aws_security_group" "web_app_sg" {
   name   = "${var.env}-web-app-sg"
@@ -131,16 +162,38 @@ resource "aws_security_group" "web_app_sg" {
   }
 }
 
-# Security Group for RDS
+# Security Group for Lambda
+resource "aws_security_group" "lambda_sg" {
+  name        = "${var.env}-lambda-sg"
+  description = "Security group for Lambda functions"
+  vpc_id      = aws_vpc.main.id
+
+  # No ingress rules needed unless Lambda needs to receive inbound traffic
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.env}-lambda-sg"
+  }
+}
+
+# Security Group for RDS (Updated to allow Lambda access)
 resource "aws_security_group" "rds_sg" {
   name   = "${var.env}-rds-sg"
   vpc_id = aws_vpc.main.id
 
   ingress {
-    from_port       = 3306
-    to_port         = 3306
+    from_port       = var.db_port
+    to_port         = var.db_port
     protocol        = "tcp"
-    security_groups = [aws_security_group.web_app_sg.id]
+    security_groups = [aws_security_group.web_app_sg.id, aws_security_group.lambda_sg.id]
+    
+    description = "Allow MySQL access from Web App and Lambda"
   }
 
   egress {
@@ -184,7 +237,7 @@ resource "aws_db_instance" "rds_instance" {
   }
 }
 
-# IAM Role for EC2 to Access S3 and CloudWatch
+# IAM Role for EC2 to Access S3, CloudWatch, and SNS Publish
 resource "aws_iam_role" "s3_access_role_to_ec2" {
   name = "${var.env}-S3BucketAccessRole"
 
@@ -243,6 +296,22 @@ resource "aws_iam_policy" "s3_cloudwatch_statsd_policy" {
   })
 }
 
+# SNS Publish Policy for EC2 Role
+resource "aws_iam_role_policy" "ec2_sns_publish_policy" {
+  name   = "${var.env}-sns-publish-policy"
+  role   = aws_iam_role.s3_access_role_to_ec2.name
+  policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [
+      {
+        Effect   : "Allow",
+        Action   : "sns:Publish",
+        Resource : "${aws_sns_topic.user_signup_topic.arn}"
+      }
+    ]
+  })
+}
+
 # Attach Policy to IAM Role
 resource "aws_iam_policy_attachment" "attach_s3_cloudwatch_statsd_policy" {
   name       = "${var.env}-attach-s3-cloudwatch-statsd-policy"
@@ -276,6 +345,29 @@ resource "aws_s3_bucket" "private_webapp_bucket" {
     Name        = "${var.env}-private-webapp-bucket"
     Environment = "${var.env} - S3 Bucket"
   }
+}
+
+# Random ID for Lambda Bucket Name
+resource "random_id" "lambda_bucket_name" {
+  byte_length = 7
+}
+
+# S3 Bucket for Lambda Function Code
+resource "aws_s3_bucket" "lambda_code_bucket" {
+  bucket        = "lambda-code-bucket-${random_id.lambda_bucket_name.hex}"
+  force_destroy = true
+
+  tags = {
+    Name = "${var.env}-lambda-code-bucket"
+  }
+}
+
+# S3 Object for Lambda Function Code (Using Absolute Path)
+resource "aws_s3_object" "lambda_code" {
+  bucket = aws_s3_bucket.lambda_code_bucket.id
+  key    = local.lambda_s3_key
+  source = "C:/Users/aayus/OneDrive/Desktop/serverless/emailVerification.zip"
+  etag   = filemd5("C:/Users/aayus/OneDrive/Desktop/serverless/emailVerification.zip")
 }
 
 # Security Group for ALB
@@ -381,6 +473,7 @@ resource "aws_launch_template" "app_launch_template" {
     echo "DB_NAME=${var.db_name}" >> /etc/environment
     echo "S3_BUCKET_NAME=${aws_s3_bucket.private_webapp_bucket.bucket}" >> /etc/environment
     echo "AWS_REGION=${var.region}" >> /etc/environment
+    echo "SNS_TOPIC_ARN=${aws_sns_topic.user_signup_topic.arn}" >> /etc/environment
 
     source /etc/environment
     sudo systemctl restart amazon-cloudwatch-agent.service
@@ -481,4 +574,144 @@ resource "aws_route53_record" "app_record" {
     zone_id                = aws_lb.app_lb.zone_id
     evaluate_target_health = true
   }
+}
+
+# SNS Topic for user signup
+resource "aws_sns_topic" "user_signup_topic" {
+  name = "${var.env}-user-signup-topic"
+}
+
+# IAM Role for Lambda (Single Definition)
+resource "aws_iam_role" "lambda_role" {
+  name = "${var.env}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [{
+      Effect : "Allow",
+      Principal : { Service : "lambda.amazonaws.com" },
+      Action : "sts:AssumeRole"
+    }]
+  })
+}
+
+# IAM Policy for Lambda to access SES, SNS, Logs, and manage ENIs for VPC access
+resource "aws_iam_policy" "lambda_policy" {
+  name        = "${var.env}-lambda-policy"
+  description = "Policy for Lambda to access SES, SNS, Logs, and manage ENIs for VPC access"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ],
+        Resource = "*"
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        # Use wildcard to allow access to all Lambda log groups
+        Resource = "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/*"
+      },
+      {
+        Effect = "Allow",
+        Action = "sns:Publish",
+        Resource = "${aws_sns_topic.user_signup_topic.arn}"
+      },
+      # EC2 permissions for VPC access
+      {
+        Effect = "Allow",
+        Action = [
+          "ec2:CreateNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DeleteNetworkInterface"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Attach the Lambda Policy to the Role
+resource "aws_iam_policy_attachment" "lambda_policy_attachment" {
+  name       = "${var.env}-lambda-policy-attachment"
+  roles      = [aws_iam_role.lambda_role.name]
+  policy_arn = aws_iam_policy.lambda_policy.arn
+}
+
+# Attach AWS Managed Policy for Lambda VPC Access
+resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# Local Variables
+locals {
+  lambda_s3_key = "emailVerification.zip"
+}
+
+# Lambda Function for email verification
+resource "aws_lambda_function" "email_verification_lambda" {
+  function_name = "${var.env}-email-verification-lambda"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "emailVerification.handler"  # Update according to your Lambda handler
+  runtime       = "nodejs18.x"                # Adjust runtime as needed
+  timeout       = 30
+
+  # Reference the S3 bucket and key for Lambda code
+  s3_bucket        = aws_s3_bucket.lambda_code_bucket.id
+  s3_key           = aws_s3_object.lambda_code.key
+  source_code_hash = filebase64sha256("C:/Users/aayus/OneDrive/Desktop/serverless/emailVerification.zip")
+
+  environment {
+    variables = {
+      DB_HOST          = aws_db_instance.rds_instance.address
+      DB_NAME          = var.db_name
+      DB_USER          = var.db_username
+      DB_PASSWORD      = var.db_password
+      SENDGRID_API_KEY = var.sendgrid_api_key
+      BASE_URL         = var.baseURL
+    }
+  }
+
+  vpc_config {
+    subnet_ids         = aws_subnet.private_subnets[*].id
+    security_group_ids = [aws_security_group.lambda_sg.id]
+  }
+
+  tags = {
+    Name = "${var.env}-email-verification-lambda"
+  }
+
+  depends_on = [
+    aws_s3_object.lambda_code,
+    aws_iam_policy_attachment.lambda_policy_attachment,
+    aws_iam_role_policy_attachment.lambda_vpc_access
+  ]
+}
+
+# SNS Topic Subscription to Lambda
+resource "aws_sns_topic_subscription" "lambda_subscription" {
+  topic_arn = aws_sns_topic.user_signup_topic.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.email_verification_lambda.arn
+}
+
+# Lambda Permission to Allow SNS Invocation
+resource "aws_lambda_permission" "allow_sns_invoke" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.email_verification_lambda.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.user_signup_topic.arn
+
+  depends_on = [aws_sns_topic.user_signup_topic, aws_lambda_function.email_verification_lambda]
 }
