@@ -667,8 +667,8 @@ resource "aws_lambda_function" "email_verification_lambda" {
   timeout       = 30
 
   # Reference the S3 bucket and key for Lambda code
-  s3_bucket        = aws_s3_bucket.lambda_code_bucket.id
-  s3_key           = aws_s3_object.lambda_code.key
+  s3_bucket = aws_s3_bucket.lambda_code_bucket.id
+  s3_key    = aws_s3_object.lambda_code.key
   #source_code_hash = filebase64sha256("C:/Users/aayus/OneDrive/Desktop/serverless/emailVerification.zip")
 
   environment {
