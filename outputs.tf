@@ -33,9 +33,3 @@ output "load_balancer_security_group_id" {
   value       = aws_security_group.lb_sg.id
   description = "The security group ID for the load balancer"
 }
-
-# Optional: Auto Scaling Group name for reference
-output "auto_scaling_group_name" {
-  description = "The name of the auto-scaling group for the application"
-  value       = aws_autoscaling_group.app_asg.name
-}

@@ -1,4 +1,4 @@
-# VPC and Subnets
+# VPC and Subnets Configuration
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   default     = "10.0.0.0/16"
@@ -35,7 +35,7 @@ variable "region" {
 
 # Environment Configuration
 variable "env" {
-  description = "Application environment"
+  description = "Application environment (e.g., dev, demo, prod)"
   default     = "demo"
 }
 
@@ -43,7 +43,7 @@ variable "env" {
 variable "allowed_ssh_cidrs" {
   description = "Allowed CIDR blocks for SSH access"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # Replace with a specific IP for better security
+  default     = ["203.0.113.0/32"] # Replace with your actual IP for better security
 }
 
 # EC2 and AMI Configuration
@@ -54,7 +54,7 @@ variable "custom_ami" {
 
 variable "instance_type" {
   description = "EC2 instance type"
-  default     = "t2.small"
+  default     = "t2.micro"
 }
 
 variable "root_volume_size" {
@@ -80,15 +80,12 @@ variable "key_pair" {
 # Database Configuration
 variable "db_name" {
   description = "The name of the RDS database"
+  type        = string
 }
 
 variable "db_username" {
   description = "The username for the RDS database"
-}
-
-variable "db_password" {
-  description = "The password for the RDS database"
-  sensitive   = true
+  type        = string
 }
 
 variable "db_port" {
@@ -100,6 +97,7 @@ variable "db_port" {
 # Domain and Route 53
 variable "domain_name" {
   description = "The root domain name for Route 53"
+  type        = string
 }
 
 variable "subdomain" {
@@ -122,17 +120,17 @@ variable "ttl" {
 # Auto-scaling Configuration
 variable "desired_capacity" {
   description = "Desired number of instances in the auto-scaling group"
-  default     = 3
+  default     = 1
 }
 
 variable "max_size" {
   description = "Maximum number of instances in the auto-scaling group"
-  default     = 5
+  default     = 1
 }
 
 variable "min_size" {
   description = "Minimum number of instances in the auto-scaling group"
-  default     = 3
+  default     = 1
 }
 
 # SNS Topic and Lambda Configuration
@@ -148,7 +146,7 @@ variable "lambda_function_name" {
 
 variable "email_sender" {
   description = "Email address to send verification emails from"
-  default     = "noreply@example.com" # Replace with your actual sender email
+  default     = "noreply@em2722.demo.csyeproject.me" # Replace with your actual sender email
 }
 
 variable "lambda_role_name" {
@@ -156,14 +154,8 @@ variable "lambda_role_name" {
   default     = "LambdaExecutionRole"
 }
 
-# SendGrid API Key
-variable "sendgrid_api_key" {
-  description = "API Key for SendGrid to send emails"
-  sensitive   = true
-}
-
 variable "baseURL" {
-  description = "The base URL for the activation link in the Lambda function."
+  description = "The base URL for the activation link in the Lambda function"
   type        = string
 }
 
@@ -179,4 +171,17 @@ variable "lambda_reserved_concurrent_executions" {
   description = "Reserved concurrent executions for the Lambda function to manage database connections"
   type        = number
   default     = 10
+}
+
+# Demo SSL Certificate ARN
+variable "demo_certificate_arn" {
+  description = "ARN of the imported SSL certificate for demo environment"
+  type        = string
+}
+
+# Sensitive Variables
+variable "sendgrid_api_key" {
+  description = "SendGrid API Key for sending emails"
+  type        = string
+  sensitive   = true
 }

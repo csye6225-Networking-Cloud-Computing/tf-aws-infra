@@ -97,7 +97,23 @@ Make sure your changes pass all checks before merging.
 - `outputs.tf`: Specifies the output values.
 - `terraform.tfvars`: Contains values for the input variables.
 
-readme updated 5
+## Import SSL Certificate into AWS ACM
+
+aws acm import-certificate \
+    --certificate fileb://path/to/your_certificate.crt \
+    --certificate-chain fileb://path/to/your_certificate_chain.ca-bundle \
+    --private-key fileb://path/to/your_private.key \
+    --region your-aws-region
+
+Replace the placeholders with your actual file paths and AWS region:
+
+path/to/your_certificate.crt: Path to your SSL certificate file.
+path/to/your_certificate_chain.ca-bundle: Path to your certificate chain file.
+path/to/your_private.key: Path to your private key file.
+your-aws-region: AWS region where you want to import the certificate (e.g., us-east-1).
+
+changes 2
+
 
 
 
