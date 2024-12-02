@@ -281,7 +281,7 @@ resource "null_resource" "delay_for_secret" {
 }
 
 resource "aws_secretsmanager_secret_version" "db_password_secret_version" {
-  secret_id = aws_secretsmanager_secret.db_password_secret.id
+  secret_id     = aws_secretsmanager_secret.db_password_secret.id
   secret_string = random_password.db_password.result
 }
 
@@ -816,7 +816,7 @@ sudo systemctl restart my-app.service
 
 echo "User data script completed"
 EOF
-)
+  )
 }
 # Auto Scaling Group
 resource "aws_autoscaling_group" "asg" {
@@ -1030,17 +1030,17 @@ resource "aws_lambda_function" "email_verification_lambda" {
   s3_key    = aws_s3_object.lambda_code.key
 
   environment {
-  variables = {
-    DB_HOST                       = aws_db_instance.rds_instance.address
-    DB_NAME                       = var.db_name
-    DB_USER                       = var.db_username
-    BASE_URL                      = var.baseURL
-    EMAIL_CREDENTIALS_SECRET_NAME = aws_secretsmanager_secret.email_service_credentials.name
-    REGION                        = var.region
-    SECRET_ID                     = aws_secretsmanager_secret.db_password_secret.id
-    DB_CREDENTIALS_SECRET_NAME    = aws_secretsmanager_secret.db_password_secret.name
+    variables = {
+      DB_HOST                       = aws_db_instance.rds_instance.address
+      DB_NAME                       = var.db_name
+      DB_USER                       = var.db_username
+      BASE_URL                      = var.baseURL
+      EMAIL_CREDENTIALS_SECRET_NAME = aws_secretsmanager_secret.email_service_credentials.name
+      REGION                        = var.region
+      SECRET_ID                     = aws_secretsmanager_secret.db_password_secret.id
+      DB_CREDENTIALS_SECRET_NAME    = aws_secretsmanager_secret.db_password_secret.name
+    }
   }
-}
   vpc_config {
     subnet_ids         = aws_subnet.private_subnets[*].id
     security_group_ids = [aws_security_group.lambda_sg.id]

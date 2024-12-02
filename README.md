@@ -112,6 +112,8 @@ path/to/your_certificate_chain.ca-bundle: Path to your certificate chain file.
 path/to/your_private.key: Path to your private key file.
 your-aws-region: AWS region where you want to import the certificate (e.g., us-east-1).
 
+changes 2
+
 
 
 
